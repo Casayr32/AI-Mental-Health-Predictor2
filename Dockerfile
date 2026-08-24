@@ -44,6 +44,7 @@ COPY --from=backend-build /app/backend /app/backend
 COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 COPY --from=ai-service-build /app/ai-service/app.py /app/ai-service/
 COPY --from=ai-service-build /app/ai-service/model_artifacts /app/ai-service/model_artifacts
+COPY --from=ai-service-build /app/ai-service/dataset.csv /app/ai-service/
 COPY ecosystem.config.js /app/
 RUN mkdir -p /app/logs && chmod +x /app/backend/server.js
 EXPOSE 5000 5001
