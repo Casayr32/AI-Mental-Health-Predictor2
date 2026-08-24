@@ -25,10 +25,12 @@ COPY ai-service/dataset.csv ./
 RUN python3 train_model.py
 
 # ---- Final Stage ----
-FROM node:20-alpine
-RUN apk add --no-cache python3 py3-pip
-COPY --from=ai-service-build /app/ai-service/requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
+FROM python:3.9-slim
+RUN apt-get update && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY --from=ai-service-build /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     NODE_ENV=production \
