@@ -27,8 +27,9 @@ RUN python3 train_model.py
 # ---- Final Stage ----
 FROM python:3.9-slim
 RUN apt-get update && \
+    apt-get install -y curl && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs curl && \
+    apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=ai-service-build /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 ENV PYTHONDONTWRITEBYTECODE=1 \
