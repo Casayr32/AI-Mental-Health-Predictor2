@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: mindcare-ai-system
+    env: docker
+    region: oregon
+    plan: standard
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+        value: mongodb+srv://<username>:<password>@cluster0.mongodb.net/mindcare_db?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        sync: false
+        value: your-super-secret-jwt-key-change-this-in-production
+      - key: NODE_ENV
+        sync: false
+        value: production
+      - key: PORT
+        sync: false
+        value: 5000
+      - key: AI_SERVICE_URL
+        sync: false
+        value: http://localhost:5001
+      - key: FRONTEND_URL
+        sync: false
+        value: https://mindcare-ai-system.onrender.com
+      - key: API_URL
+        sync: false
+        value: https://mindcare-ai-system.onrender.com/api
+    healthCheckPath: /api/test
+    healthCheckTimeout: 120
+    healthCheckHttpHeaders:
+      - name: Content-Type
+        value: application/json
+    disk:
+      name: model_artifacts
+      mountPath: /app/ai-service/model_artifacts
+      sizeGB: 2
+    buildCommand: docker build -t mindcare-ai-system .
+    startCommand: docker run -p 5000:5000 -p 5001:5001 --env-file .env mindcare-ai-system
+    numInstances: 1
+    maxMemSizeMB: 2048
+    minMemorySizeMB: 1024
+    autoDeploy: true
