@@ -1,4 +1,6 @@
 # MindCare AI System - Production Dockerfile
+
+# ---- Frontend Build ----
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -6,20 +8,23 @@ RUN npm ci && npm cache clean --force
 COPY frontend/ ./
 RUN npm run build
 
+# ---- Backend Build ----
 FROM node:20-alpine AS backend-build
 WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 COPY backend/ ./
 
+# ---- AI Service Build ----
 FROM python:3.9-slim AS ai-service-build
 WORKDIR /app/ai-service
 COPY ai-service/requirements.txt* ./
 RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 COPY ai-service/*.py ./
 COPY ai-service/dataset.csv ./
-RUN python3 setup_model.py
+RUN python3 train_model.py
 
+# ---- Final Stage ----
 FROM node:20-alpine
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
