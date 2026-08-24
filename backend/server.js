@@ -10,9 +10,11 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+app.use(cors());
+
+
 // Middlewares
 app.use(express.json());
-app.use(cors());
 
 // Connect to MongoDB Atlas (La saaray options-kii duqoobay ee qaladka keenayay)
 const mongoUri = process.env.MONGO_URI || process.env.MONGO_URL || 'mongodb+srv://ahmed:7451@cluster0.bhe2hmw.mongodb.net/mental_ai_care?retryWrites=true&w=majority&appName=Cluster0';
