@@ -28,7 +28,7 @@ RUN python3 train_model.py
 FROM node:20-alpine
 RUN apk add --no-cache python3 py3-pip
 COPY --from=ai-service-build /app/ai-service/requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     NODE_ENV=production \
