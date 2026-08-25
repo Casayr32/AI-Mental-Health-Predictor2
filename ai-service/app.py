@@ -6,24 +6,30 @@ import os
 
 app = Flask(__name__)
 
-# Hel waddada saxda ah ee galka uu app.py ku jiro (Absolute Path)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(base_dir, 'dataset.csv')
+model_dir = os.path.join(base_dir, 'model_artifacts')
 
-# 1. Load dataset for 100% Exact Matching
 print("Loading dataset for exact lookup...")
 df_dataset = pd.read_csv(csv_path)
-# Ka dhig Previous Diagnosis 'None' haddii uu NaN yahay
 df_dataset['Previous Diagnosis'] = df_dataset['Previous Diagnosis'].fillna('None')
 
+# Hubi in model_artifacts uu jiro. Haddii uu maqnayn, samee train_model.py si toos ah.
+if not os.path.exists(os.path.join(model_dir, 'ai_model.joblib')):
+    print("⚠️ Model not found! Running train_model.py to generate models...")
+    from train_model import train_and_save_model
+    train_and_save_model() # Hubi in function-kan uu ku jiro train_model.py
+else:
+    print("✅ Model files found.")
+
 print("Loading AI model and encoders...")
-model = joblib.load(os.path.join(base_dir, 'model_artifacts/ai_model.joblib'))
-le_symptoms = joblib.load(os.path.join(base_dir, 'model_artifacts/le_symptoms.joblib'))
-le_diagnosis = joblib.load(os.path.join(base_dir, 'model_artifacts/le_diagnosis.joblib'))
-le_disorder = joblib.load(os.path.join(base_dir, 'model_artifacts/le_disorder.joblib'))
-le_urgency = joblib.load(os.path.join(base_dir, 'model_artifacts/le_urgency.joblib'))
-le_therapy = joblib.load(os.path.join(base_dir, 'model_artifacts/le_therapy.joblib'))
-le_selfcare = joblib.load(os.path.join(base_dir, 'model_artifacts/le_selfcare.joblib'))
+model = joblib.load(os.path.join(model_dir, 'ai_model.joblib'))
+le_symptoms = joblib.load(os.path.join(model_dir, 'le_symptoms.joblib'))
+le_diagnosis = joblib.load(os.path.join(model_dir, 'le_diagnosis.joblib'))
+le_disorder = joblib.load(os.path.join(model_dir, 'le_disorder.joblib'))
+le_urgency = joblib.load(os.path.join(model_dir, 'le_urgency.joblib'))
+le_therapy = joblib.load(os.path.join(model_dir, 'le_therapy.joblib'))
+le_selfcare = joblib.load(os.path.join(model_dir, 'le_selfcare.joblib'))
 
 def bulletproof_transform(encoder, val):
     val_str = str(val).strip().lower() if val is not None else ""
@@ -110,4 +116,4 @@ def predict():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(port=5001, debug=False)
+    app.run(host='0.0.0.0', port=7860, debug=False)
