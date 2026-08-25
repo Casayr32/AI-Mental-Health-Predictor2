@@ -6,7 +6,7 @@ import axios from 'axios';
 const API = axios.create({
     baseURL: window.location.hostname === 'localhost' 
         ? 'http://localhost:5000/api' 
-        : 'https://ai-mental-health-predictor2-6dw0.onrender.com'
+        : 'https://asayr-mental-health-care.hf.space'
 });
 //https://ai-mental-health-predictor2-3.onrender.com/api
 // REQUEST INTERCEPTOR
