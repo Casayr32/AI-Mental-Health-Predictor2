@@ -1,12 +1,25 @@
 import os
 import joblib
 import numpy as np
+import pandas as pd
 import gradio as gr
 
-# --- 1. LOAD ARTIFACTS ---
+# --- 1. PATHS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "model_artifacts")
+DATASET_PATH = os.path.join(BASE_DIR, "dataset.csv")
 
+# --- 2. DYNAMIC DROPDOWN CHOICES ---
+# Read the dataset to automatically get the exact options for the UI
+print("Reading dataset for UI choices...")
+df = pd.read_csv(DATASET_PATH)
+
+symptom_choices = df['Symptoms'].dropna().unique().tolist()
+prev_diag_choices = df['Previous Diagnosis'].fillna('None').unique().tolist()
+mood_choices = df['Mood'].dropna().unique().tolist()
+stress_choices = df['Stress Level'].dropna().unique().tolist()
+
+# --- 3. LOAD ARTIFACTS ---
 print("Loading trained model and encoders...")
 model = joblib.load(os.path.join(ARTIFACTS_DIR, 'ai_model.joblib'))
 le_symptoms = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_symptoms.joblib'))
@@ -18,7 +31,7 @@ le_urgency = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_urgency.joblib'))
 le_therapy = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_therapy.joblib'))
 le_selfcare = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_selfcare.joblib'))
 
-# --- 2. PREDICTION FUNCTION ---
+# --- 4. PREDICTION FUNCTION ---
 def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, medication, mood, stress_level):
     try:
         # Encode inputs exactly like training
@@ -65,22 +78,21 @@ def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, m
     except Exception as e:
         return {"Error": f"Prediction failed: {str(e)}"}
 
-# --- 3. GRADIO INTERFACE ---
-# WARNING: Replace the choices=[] lists below with the ACTAL text options from your dataset.csv!
+# --- 5. GRADIO INTERFACE ---
 demo = gr.Interface(
     fn=predict_mental_health,
     inputs=[
-        gr.Dropdown(label="Symptoms", choices=["Anxiety", "Depression", "Panic Attacks"]), # UPDATE CHOICES
+        gr.Dropdown(label="Symptoms", choices=symptom_choices),
         gr.Number(label="Duration (weeks)", value=4),
-        gr.Dropdown(label="Previous Diagnosis", choices=["None", "ADHD", "Bipolar"]), # UPDATE CHOICES
+        gr.Dropdown(label="Previous Diagnosis", choices=prev_diag_choices),
         gr.Radio(["Yes", "No"], label="Therapy History"),
         gr.Radio(["Yes", "No"], label="Medication"),
-        gr.Dropdown(label="Mood", choices=["Sad", "Anxious", "Normal"]), # UPDATE CHOICES
-        gr.Dropdown(label="Stress Level", choices=["Low", "Medium", "High"]) # UPDATE CHOICES
+        gr.Dropdown(label="Mood", choices=mood_choices),
+        gr.Dropdown(label="Stress Level", choices=stress_choices)
     ],
     outputs="json",
     title="MindCare AI Predictor",
-    description="Multi-output mental health prediction model."
+    description="Multi-output mental health prediction model trained on your dataset."
 )
 
 if __name__ == "__main__":
