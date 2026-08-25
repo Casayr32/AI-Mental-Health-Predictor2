@@ -36,7 +36,6 @@ export default function Login({ setUser }) {
     const [resetToken, setResetToken] = useState('');
     const [newPass, setNewPass] = useState('');
 
-    // Helper: clear all inputs
     const clearAllInputs = () => {
         setEmail('');
         setPassword('');
@@ -49,21 +48,18 @@ export default function Login({ setUser }) {
         setNewPass('');
     };
 
-    // Helper: map frontend role to backend role name
     const getBackendRole = (r) => {
         if (r === 'admin') return 'Admin';
         if (r === 'clinician') return 'Doctor';
         return 'Patient';
     };
 
-    // Helper: map backend role to frontend route prefix
     const getRoutePrefix = (r) => {
         if (r === 'Admin') return 'admin';
         if (r === 'Doctor') return 'doctor';
         return 'patient';
     };
 
-    // Save token in BOTH user object AND dedicated slot
     const saveAuthData = (userData) => {
         localStorage.setItem('user', JSON.stringify(userData));
         if (userData.token) {
@@ -74,6 +70,8 @@ export default function Login({ setUser }) {
 
     const handleAuth = async (e) => {
         e.preventDefault();
+        console.log("--> handleAuth triggered!", { isRegistering, email, role }); // Debug line
+
         if (isRegistering && password !== confirmPass) {
             return toast('Passwords do not match', 'error');
         }
@@ -117,6 +115,7 @@ export default function Login({ setUser }) {
                 navigate(`/${getRoutePrefix(backendRole)}/dashboard`);
             }
         } catch (error) {
+            console.error("Auth Error:", error);
             toast(error.response?.data?.message || 'Authentication failed', 'error');
         }
     };
@@ -145,29 +144,6 @@ export default function Login({ setUser }) {
         clearAllInputs();
     };
 
-    const demoLogin = async (demoRole) => {
-        setRole(demoRole);
-        clearAllInputs();
-        const backendRole = getBackendRole(demoRole);
-        const demoCreds = {
-            email: demoRole === 'patient' ? 'patient@demo.com' : demoRole === 'admin' ? 'admin@demo.com' : 'doctor@demo.com',
-            password: '123456',
-            role: backendRole
-        };
-
-        try {
-            const res = await loginUser(demoCreds);
-            const userData = { ...(res.data || {}), role: backendRole };
-            saveAuthData(userData);
-
-            toast('Demo login successful!', 'success');
-            navigate(`/${getRoutePrefix(backendRole)}/dashboard`);
-        } catch (error) {
-            toast('Demo users not found in DB. Please register a new account first.', 'warning');
-        }
-    };
-
-    // --- FORGOT PASSWORD UI ---
     if (isForgotPass) {
         return (
             <div className="screen active">
@@ -184,17 +160,17 @@ export default function Login({ setUser }) {
                             {resetStep === 1 ? (
                                 <div className="fg">
                                     <label className="fl">Email address</label>
-                                    <input className="fi" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="off" name="no-autofill-email-1" />
+                                    <input className="fi" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
                                 </div>
                             ) : (
                                 <>
                                     <div className="fg">
                                         <label className="fl">Reset Token</label>
-                                        <input className="fi" type="text" required value={resetToken} onChange={e => setResetToken(e.target.value)} placeholder="Paste token from email" autoComplete="off" name="no-autofill-token" />
+                                        <input className="fi" type="text" required value={resetToken} onChange={e => setResetToken(e.target.value)} placeholder="Paste token from email" />
                                     </div>
                                     <div className="fg">
                                         <label className="fl">New Password</label>
-                                        <input className="fi" type="password" required value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Min 6 characters" autoComplete="new-password" name="no-autofill-newpass" />
+                                        <input className="fi" type="password" required value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Min 6 characters" />
                                     </div>
                                 </>
                             )}
@@ -215,7 +191,6 @@ export default function Login({ setUser }) {
         );
     }
 
-    // --- MAIN LOGIN / REGISTER UI ---
     return (
         <div className="screen active" id="scr-login">
             <div className="login-bg">
@@ -235,27 +210,28 @@ export default function Login({ setUser }) {
                         </button>
                     </div>
 
-                    <form onSubmit={handleAuth} autoComplete="off" key={isRegistering ? 'reg' : 'login'}>
+                    {/* noValidate waxaa loo kadday si uu u ogolaado JS handling xata hadii field dhimanyahay */}
+                    <form onSubmit={handleAuth} noValidate autoComplete="off" key={isRegistering ? 'reg' : 'login'}>
                         {isRegistering && (
                             <>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <div className="fg" style={{ flex: 1 }}>
                                         <label className="fl">First Name</label>
-                                        <input className="fi" type="text" required value={fName} onChange={e => setFName(e.target.value)} autoComplete="off" name="no-autofill-fname" />
+                                        <input className="fi" type="text" value={fName} onChange={e => setFName(e.target.value)} />
                                     </div>
                                     <div className="fg" style={{ flex: 1 }}>
                                         <label className="fl">Middle Name</label>
-                                        <input className="fi" type="text" value={mName} onChange={e => setMName(e.target.value)} autoComplete="off" name="no-autofill-mname" />
+                                        <input className="fi" type="text" value={mName} onChange={e => setMName(e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="fg">
                                     <label className="fl">Last Name</label>
-                                    <input className="fi" type="text" required value={lName} onChange={e => setLName(e.target.value)} autoComplete="off" name="no-autofill-lname" />
+                                    <input className="fi" type="text" value={lName} onChange={e => setLName(e.target.value)} />
                                 </div>
                                 {role === 'clinician' && (
                                     <div className="fg">
                                         <label className="fl">Specialisation</label>
-                                        <input className="fi" type="text" required value={specialisation} onChange={e => setSpecialisation(e.target.value)} placeholder="e.g. Psychiatry" autoComplete="off" name="no-autofill-spec" />
+                                        <input className="fi" type="text" value={specialisation} onChange={e => setSpecialisation(e.target.value)} placeholder="e.g. Psychiatry" />
                                     </div>
                                 )}
                             </>
@@ -263,7 +239,7 @@ export default function Login({ setUser }) {
 
                         <div className="fg">
                             <label className="fl">Email address</label>
-                            <input className="fi" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="off" name="no-autofill-email-main" />
+                            <input className="fi" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
                         </div>
 
                         <div className="fg">
@@ -275,13 +251,13 @@ export default function Login({ setUser }) {
                                     </button>
                                 )}
                             </div>
-                            <input className="fi" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="new-password" name="no-autofill-password-main" />
+                            <input className="fi" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" />
                         </div>
 
                         {isRegistering && (
                             <div className="fg" style={{ marginBottom: '12px' }}>
                                 <label className="fl">Confirm Password</label>
-                                <input className="fi" type="password" required value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Confirm your password" autoComplete="new-password" name="no-autofill-confirmpass" />
+                                <input className="fi" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Confirm your password" />
                             </div>
                         )}
 
@@ -297,17 +273,6 @@ export default function Login({ setUser }) {
                             </div>
                         )}
                     </form>
-
-                    <div style={{ marginTop: '20px', paddingTop: '18px', borderTop: '1px solid var(--border)' }}>
-                        {/* <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center', marginBottom: '10px', fontWeight: '600', letterSpacing: '.04em' }}>
-                            QUICK DEMO ACCESS
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" className="btn btn-out btn-block" style={{ fontSize: '12px' }} onClick={() => demoLogin('patient')}><i className="ti ti-user"></i> Patient</button>
-                            <button type="button" className="btn btn-out btn-block" style={{ fontSize: '12px' }} onClick={() => demoLogin('clinician')}><i className="ti ti-stethoscope"></i> Clinician</button>
-                            <button type="button" className="btn btn-out btn-block" style={{ fontSize: '12px' }} onClick={() => demoLogin('admin')}><i className="ti ti-shield-check"></i> Admin</button>
-                        </div> */}
-                    </div>
                 </div>
             </div>
         </div>
