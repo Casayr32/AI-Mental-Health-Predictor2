@@ -188,7 +188,7 @@ auth_ui = gr.Interface(
 # We use TabbedInterface so you can still test the predictor visually,
 # while React communicates with the auth API in the background.
 demo = gr.TabbedInterface(
-    interfaces=[predictor_ui, auth_ui], 
+    interface_list=[predictor_ui, auth_ui],  # <-- Changed 'interfaces' to 'interface_list'
     tab_names=["MindCare Predictor", "Auth API (For React)"]
 )
 
