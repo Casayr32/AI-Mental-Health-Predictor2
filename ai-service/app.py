@@ -3,25 +3,89 @@ import joblib
 import numpy as np
 import pandas as pd
 import gradio as gr
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
 
 # --- 1. PATHS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "model_artifacts")
 DATASET_PATH = os.path.join(BASE_DIR, "dataset.csv")
+MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'ai_model.joblib')
 
-# --- 2. DYNAMIC DROPDOWN CHOICES ---
-# Read the dataset to automatically get the exact options for the UI
-print("Reading dataset for UI choices...")
-df = pd.read_csv(DATASET_PATH)
+# --- 2. AUTO-TRAINING LOGIC ---
+# If the model doesn't exist, train it right now before doing anything else
+if not os.path.exists(MODEL_PATH):
+    print("❌ Model not found. Starting training process right now...")
+    
+    try:
+        df = pd.read_csv(DATASET_PATH)
+        df['Previous Diagnosis'] = df['Previous Diagnosis'].fillna('None')
 
-symptom_choices = df['Symptoms'].dropna().unique().tolist()
-prev_diag_choices = df['Previous Diagnosis'].fillna('None').unique().tolist()
-mood_choices = df['Mood'].dropna().unique().tolist()
-stress_choices = df['Stress Level'].dropna().unique().tolist()
+        input_features = ['Symptoms', 'Duration (weeks)', 'Previous Diagnosis', 'Therapy History', 'Medication', 'Mood', 'Stress Level']
+        target_features = ['Diagnosis / Condition', 'Urgency Level', 'Suggested Therapy', 'Self-care Advice']
+
+        X_raw = df[input_features].copy()
+        Y_raw = df[target_features].copy()
+
+        print("Encoding input data...")
+        le_symptoms = LabelEncoder()
+        X_raw['Symptoms'] = le_symptoms.fit_transform(X_raw['Symptoms'].astype(str))
+
+        le_diagnosis = LabelEncoder()
+        X_raw['Previous Diagnosis'] = le_diagnosis.fit_transform(X_raw['Previous Diagnosis'].astype(str))
+
+        le_mood = LabelEncoder()
+        X_raw['Mood'] = le_mood.fit_transform(X_raw['Mood'].astype(str))
+
+        le_stress = LabelEncoder()
+        X_raw['Stress Level'] = le_stress.fit_transform(X_raw['Stress Level'].astype(str))
+
+        X_raw['Duration (weeks)'] = X_raw['Duration (weeks)'] / 51.0 
+        X_raw['Therapy History'] = X_raw['Therapy History'].map({'Yes': 1, 'No': 0}).fillna(0)
+        X_raw['Medication'] = X_raw['Medication'].map({'Yes': 1, 'No': 0}).fillna(0)
+
+        X = X_raw.values
+
+        print("Encoding target data...")
+        le_disorder = LabelEncoder()
+        le_urgency = LabelEncoder()
+        le_therapy = LabelEncoder()
+        le_selfcare = LabelEncoder()
+
+        Y_encoded = np.column_stack([
+            le_disorder.fit_transform(Y_raw['Diagnosis / Condition'].astype(str)),
+            le_urgency.fit_transform(Y_raw['Urgency Level'].astype(str)),
+            le_therapy.fit_transform(Y_raw['Suggested Therapy'].astype(str)),
+            le_selfcare.fit_transform(Y_raw['Self-care Advice'].astype(str))
+        ])
+
+        print("Training AI Model (this might take a minute)...")
+        base_model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model = MultiOutputClassifier(base_model, n_jobs=-1)
+        model.fit(X, Y_encoded)
+
+        print("Saving model and encoders...")
+        os.makedirs(ARTIFACTS_DIR, exist_ok=True)
+
+        joblib.dump(model, MODEL_PATH)
+        joblib.dump(le_symptoms, os.path.join(ARTIFACTS_DIR, 'le_symptoms.joblib'))
+        joblib.dump(le_diagnosis, os.path.join(ARTIFACTS_DIR, 'le_diagnosis.joblib'))
+        joblib.dump(le_mood, os.path.join(ARTIFACTS_DIR, 'le_mood.joblib'))
+        joblib.dump(le_stress, os.path.join(ARTIFACTS_DIR, 'le_stress.joblib'))
+        joblib.dump(le_disorder, os.path.join(ARTIFACTS_DIR, 'le_disorder.joblib'))
+        joblib.dump(le_urgency, os.path.join(ARTIFACTS_DIR, 'le_urgency.joblib'))
+        joblib.dump(le_therapy, os.path.join(ARTIFACTS_DIR, 'le_therapy.joblib'))
+        joblib.dump(le_selfcare, os.path.join(ARTIFACTS_DIR, 'le_selfcare.joblib'))
+        print("✅ SUCCESS: Model trained and saved!")
+
+    except Exception as e:
+        print(f"🔴 TRAINING FAILED: {str(e)}")
+        print("Please check your dataset.csv columns and data types.")
 
 # --- 3. LOAD ARTIFACTS ---
 print("Loading trained model and encoders...")
-model = joblib.load(os.path.join(ARTIFACTS_DIR, 'ai_model.joblib'))
+model = joblib.load(MODEL_PATH)
 le_symptoms = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_symptoms.joblib'))
 le_diagnosis = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_diagnosis.joblib'))
 le_mood = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_mood.joblib'))
@@ -31,14 +95,20 @@ le_urgency = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_urgency.joblib'))
 le_therapy = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_therapy.joblib'))
 le_selfcare = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_selfcare.joblib'))
 
-# --- 4. PREDICTION FUNCTION ---
+# --- 4. DYNAMIC DROPDOWN CHOICES ---
+print("Reading dataset for UI choices...")
+df = pd.read_csv(DATASET_PATH)
+symptom_choices = df['Symptoms'].dropna().unique().tolist()
+prev_diag_choices = df['Previous Diagnosis'].fillna('None').unique().tolist()
+mood_choices = df['Mood'].dropna().unique().tolist()
+stress_choices = df['Stress Level'].dropna().unique().tolist()
+
+# --- 5. PREDICTION FUNCTION ---
 def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, medication, mood, stress_level):
     try:
-        # Encode inputs exactly like training
         symptoms_enc = le_symptoms.transform([symptoms])[0]
         duration_enc = duration / 51.0 
         
-        # Handle unseen labels safely
         if prev_diagnosis in le_diagnosis.classes_:
             prev_diag_enc = le_diagnosis.transform([prev_diagnosis])[0]
         else:
@@ -57,13 +127,9 @@ def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, m
         therapy_enc = 1 if therapy_history == "Yes" else 0
         med_enc = 1 if medication == "Yes" else 0
 
-        # Create array (MUST match the exact column order from train_model.py)
         X_input = np.array([[symptoms_enc, duration_enc, prev_diag_enc, therapy_enc, med_enc, mood_enc, stress_enc]])
-
-        # Predict
         prediction_encoded = model.predict(X_input)[0]
         
-        # Decode back to text
         diagnosis = le_disorder.inverse_transform([prediction_encoded[0]])[0]
         urgency = le_urgency.inverse_transform([prediction_encoded[1]])[0]
         therapy = le_therapy.inverse_transform([prediction_encoded[2]])[0]
@@ -76,9 +142,9 @@ def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, m
             "Self-care Advice": str(selfcare)
         }
     except Exception as e:
-        return {"Error": f"Prediction failed: {str(e)}"}
+        return {"Error": str(e)}
 
-# --- 5. GRADIO INTERFACE ---
+# --- 6. GRADIO INTERFACE ---
 demo = gr.Interface(
     fn=predict_mental_health,
     inputs=[
@@ -91,8 +157,7 @@ demo = gr.Interface(
         gr.Dropdown(label="Stress Level", choices=stress_choices)
     ],
     outputs="json",
-    title="MindCare AI Predictor",
-    description="Multi-output mental health prediction model trained on your dataset."
+    title="MindCare AI Predictor"
 )
 
 if __name__ == "__main__":
