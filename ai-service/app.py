@@ -1,5 +1,4 @@
 import os
-import spaces
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
@@ -45,7 +44,6 @@ def bulletproof_transform(encoder, val):
     return encoder.transform([raw_classes[first_valid_idx]])[0]
 
 @app.route('/predict', methods=['POST'])
-@spaces.GPU
 def predict():
     try:
         data = request.json
