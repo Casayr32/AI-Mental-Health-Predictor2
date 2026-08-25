@@ -1,4 +1,5 @@
 import os
+import gc
 import joblib
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "model_artifacts")
 DATASET_PATH = os.path.join(BASE_DIR, "dataset.csv")
 MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'ai_model.joblib')
+CHOICES_PATH = os.path.join(ARTIFACTS_DIR, 'ui_choices.joblib')
 
 # --- 2. AUTO-TRAINING LOGIC ---
 if not os.path.exists(MODEL_PATH):
@@ -59,8 +61,17 @@ if not os.path.exists(MODEL_PATH):
             le_selfcare.fit_transform(Y_raw['Self-care Advice'].astype(str))
         ])
 
-        print("Training AI Model (this might take a minute)...")
-        base_model = RandomForestClassifier(n_estimators=100, random_state=42)
+        # Save UI choices NOW so we don't have to read the CSV again later
+        ui_choices = {
+            "symptoms": df['Symptoms'].dropna().unique().tolist(),
+            "prev_diag": df['Previous Diagnosis'].fillna('None').unique().tolist(),
+            "mood": df['Mood'].dropna().unique().tolist(),
+            "stress": df['Stress Level'].dropna().unique().tolist()
+        }
+
+        print("Training AI Model (Optimized for low memory)...")
+        # CHANGED TO 30 TREES TO SAVE RAM
+        base_model = RandomForestClassifier(n_estimators=30, random_state=42)
         model = MultiOutputClassifier(base_model, n_jobs=-1)
         model.fit(X, Y_encoded)
 
@@ -76,7 +87,13 @@ if not os.path.exists(MODEL_PATH):
         joblib.dump(le_urgency, os.path.join(ARTIFACTS_DIR, 'le_urgency.joblib'))
         joblib.dump(le_therapy, os.path.join(ARTIFACTS_DIR, 'le_therapy.joblib'))
         joblib.dump(le_selfcare, os.path.join(ARTIFACTS_DIR, 'le_selfcare.joblib'))
-        print("✅ SUCCESS: Model trained and saved!")
+        joblib.dump(ui_choices, CHOICES_PATH)
+        
+        # FREE UP RAM
+        del df, X_raw, Y_raw, X, Y_encoded, model, base_model
+        gc.collect()
+        
+        print("✅ SUCCESS: Model trained, saved, and memory cleared!")
 
     except Exception as e:
         print(f"🔴 TRAINING FAILED: {str(e)}")
@@ -93,15 +110,10 @@ le_urgency = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_urgency.joblib'))
 le_therapy = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_therapy.joblib'))
 le_selfcare = joblib.load(os.path.join(ARTIFACTS_DIR, 'le_selfcare.joblib'))
 
-# --- 4. DYNAMIC DROPDOWN CHOICES ---
-print("Reading dataset for UI choices...")
-df = pd.read_csv(DATASET_PATH)
-symptom_choices = df['Symptoms'].dropna().unique().tolist()
-prev_diag_choices = df['Previous Diagnosis'].fillna('None').unique().tolist()
-mood_choices = df['Mood'].dropna().unique().tolist()
-stress_choices = df['Stress Level'].dropna().unique().tolist()
+# Load choices from saved file instead of reading CSV again!
+ui_choices = joblib.load(CHOICES_PATH)
 
-# --- 5. PREDICTION FUNCTION ---
+# --- 4. PREDICTION FUNCTION ---
 def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, medication, mood, stress_level):
     try:
         symptoms_enc = le_symptoms.transform([symptoms])[0]
@@ -142,53 +154,40 @@ def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, m
     except Exception as e:
         return {"Error": str(e)}
 
-# --- 6. AUTHENTICATION FUNCTION (FOR YOUR REACT FRONTEND) ---
+# --- 5. AUTHENTICATION FUNCTION ---
 def mock_login(email: str, password: str):
-    """
-    Mock authentication for the React frontend.
-    Replace this logic with your real database check later.
-    """
     print(f"Login attempt for: {email}")
     if email and password:
-        # Returning a mock success response
         return {"success": True, "token": "fake-jwt-token-12345", "role": "admin"}
     return {"success": False, "message": "Missing credentials"}
 
-# --- 7. BUILD GRADIO INTERFACES ---
-
-# Interface 1: The AI Predictor UI
+# --- 6. BUILD GRADIO INTERFACES ---
 predictor_ui = gr.Interface(
     fn=predict_mental_health,
     inputs=[
-        gr.Dropdown(label="Symptoms", choices=symptom_choices),
+        gr.Dropdown(label="Symptoms", choices=ui_choices["symptoms"]),
         gr.Number(label="Duration (weeks)", value=4),
-        gr.Dropdown(label="Previous Diagnosis", choices=prev_diag_choices),
+        gr.Dropdown(label="Previous Diagnosis", choices=ui_choices["prev_diag"]),
         gr.Radio(["Yes", "No"], label="Therapy History"),
         gr.Radio(["Yes", "No"], label="Medication"),
-        gr.Dropdown(label="Mood", choices=mood_choices),
-        gr.Dropdown(label="Stress Level", choices=stress_choices)
+        gr.Dropdown(label="Mood", choices=ui_choices["mood"]),
+        gr.Dropdown(label="Stress Level", choices=ui_choices["stress"])
     ],
     outputs="json",
     title="MindCare AI Predictor",
-    api_name="/predict" # Optional: gives your react app a clean endpoint for predictions too
+    api_name="/predict"
 )
 
-# Interface 2: The Auth API (Hidden from main UI, but accessible via POST request)
 auth_ui = gr.Interface(
     fn=mock_login,
-    inputs=[
-        gr.Textbox(label="Email"),
-        gr.Textbox(label="Password")
-    ],
+    inputs=[gr.Textbox(label="Email"), gr.Textbox(label="Password")],
     outputs="json",
-    api_name="/auth/login" # This creates the exact POST route your React app is looking for!
+    api_name="/auth/login"
 )
 
-# --- 8. COMBINE AND LAUNCH ---
-# We use TabbedInterface so you can still test the predictor visually,
-# while React communicates with the auth API in the background.
+# --- 7. COMBINE AND LAUNCH ---
 demo = gr.TabbedInterface(
-    interface_list=[predictor_ui, auth_ui],  # <-- Changed 'interfaces' to 'interface_list'
+    interface_list=[predictor_ui, auth_ui], 
     tab_names=["MindCare Predictor", "Auth API (For React)"]
 )
 
