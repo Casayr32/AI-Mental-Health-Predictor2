@@ -12,7 +12,6 @@ scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
 features = joblib.load(os.path.join(MODEL_DIR, "features.joblib"))
 
 def predict_mental_health(age, gender, family_history, work_interfere, no_employees, remote_work, tech_company, benefits, care_options):
-    # Construct input dataframe
     input_data = pd.DataFrame([{
         'Age': age,
         'Gender': gender,
@@ -25,13 +24,15 @@ def predict_mental_health(age, gender, family_history, work_interfere, no_employ
         'care_options': care_options
     }])
     
-    # Scale & Predict
     scaled_data = scaler.transform(input_data[features])
     prediction = model.predict(scaled_data)[0]
     probability = model.predict_proba(scaled_data)[0][1]
     
     result = "Needs Treatment" if prediction == 1 else "No Immediate Treatment Needed"
-    return f"Prediction: {result} (Confidence: {probability:.2%})"
+    return {
+        "prediction": result,
+        "confidence": float(probability)
+    }
 
 # Gradio Interface
 demo = gr.Interface(
@@ -47,9 +48,9 @@ demo = gr.Interface(
         gr.Radio(["Yes", "No", "Don't know"], label="Benefits"),
         gr.Radio(["Yes", "No", "Not sure"], label="Care Options")
     ],
-    outputs="text",
+    outputs="json",
     title="MindCare AI Predictor"
 )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch()
