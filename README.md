@@ -3,8 +3,8 @@ title: MindCare AI System
 emoji: 🧠
 colorFrom: blue
 colorTo: indigo
-sdk: docker
-app_port: 7860
+sdk: gradio
+app_file: ai-service/app.py
 pinned: false
 ---
 
