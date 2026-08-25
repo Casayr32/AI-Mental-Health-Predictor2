@@ -6,76 +6,79 @@ from sklearn.multioutput import MultiOutputClassifier
 import joblib
 import os
 
-print("Loading dataset...")
-# Load the CSV file
-df = pd.read_csv('dataset.csv')
+# Hel waddada saxda ah ee galka uu train_model.py ku jiro
+base_dir = os.path.dirname(os.path.abspath(__file__))
+csv_path = os.path.join(base_dir, 'dataset.csv')
+artifacts_dir = os.path.join(base_dir, 'model_artifacts')
 
-# Define exact columns from documentation
-input_features = ['Symptoms', 'Duration (weeks)', 'Previous Diagnosis', 'Therapy History', 'Medication', 'Mood', 'Stress Level']
-target_features = ['Diagnosis / Condition', 'Urgency Level', 'Suggested Therapy', 'Self-care Advice']
+def train_and_save_model():
+    print("Loading dataset...")
+    df = pd.read_csv(csv_path)
 
-# Extract X (Inputs) and Y (Targets)
-X_raw = df[input_features]
-Y_raw = df[target_features]
+    # Fill NaN values if any in Previous Diagnosis
+    df['Previous Diagnosis'] = df['Previous Diagnosis'].fillna('None')
 
-print("Encoding input data (Mapping to mathematical vector X)...")
+    # Define exact columns from documentation
+    input_features = ['Symptoms', 'Duration (weeks)', 'Previous Diagnosis', 'Therapy History', 'Medication', 'Mood', 'Stress Level']
+    target_features = ['Diagnosis / Condition', 'Urgency Level', 'Suggested Therapy', 'Self-care Advice']
 
-# 1. Encode r1: Symptoms (Categorical - Label Encoding)
-le_symptoms = LabelEncoder()
-X_raw['Symptoms'] = le_symptoms.fit_transform(X_raw['Symptoms'])
+    # Extract X (Inputs) and Y (Targets)
+    X_raw = df[input_features].copy()
+    Y_raw = df[target_features].copy()
 
-# 2. Encode r2: Duration (Numerical - Normalized between 0 and 1)
-X_raw['Duration (weeks)'] = X_raw['Duration (weeks)'] / 51.0 
+    print("Encoding input data (Mapping to mathematical vector X)...")
 
-# 3. Encode r3: Previous Diagnosis (Categorical - Label Encoding)
-le_diagnosis = LabelEncoder()
-X_raw['Previous Diagnosis'] = le_diagnosis.fit_transform(X_raw['Previous Diagnosis'])
+    # 1. Encode r1: Symptoms
+    le_symptoms = LabelEncoder()
+    X_raw['Symptoms'] = le_symptoms.fit_transform(X_raw['Symptoms'])
 
-# 4. Encode r4: Therapy History (Binary - 0 or 1)
-X_raw['Therapy History'] = X_raw['Therapy History'].map({'Yes': 1, 'No': 0})
+    # 2. Encode r2: Duration (Normalized)
+    X_raw['Duration (weeks)'] = X_raw['Duration (weeks)'] / 51.0 
 
-# 5. Encode r5: Medication (Binary - 0 or 1)
-X_raw['Medication'] = X_raw['Medication'].map({'Yes': 1, 'No': 0})
+    # 3. Encode r3: Previous Diagnosis
+    le_diagnosis = LabelEncoder()
+    X_raw['Previous Diagnosis'] = le_diagnosis.fit_transform(X_raw['Previous Diagnosis'])
 
-# r6 (Mood) and r7 (Stress Level) are already numerical 1-10, we leave them as is.
+    # 4. Encode r4: Therapy History
+    X_raw['Therapy History'] = X_raw['Therapy History'].map({'Yes': 1, 'No': 0}).fillna(0)
 
-# Convert to NumPy array (This is our final X vector)
-X = X_raw.values
+    # 5. Encode r5: Medication
+    X_raw['Medication'] = X_raw['Medication'].map({'Yes': 1, 'No': 0}).fillna(0)
 
-print("Encoding target data...")
-# Encode the 4 output targets
-le_disorder = LabelEncoder()
-le_urgency = LabelEncoder()
-le_therapy = LabelEncoder()
-le_selfcare = LabelEncoder()
+    # Convert to NumPy array
+    X = X_raw.values
 
-Y_encoded = np.column_stack([
-    le_disorder.fit_transform(Y_raw['Diagnosis / Condition']),
-    le_urgency.fit_transform(Y_raw['Urgency Level']),
-    le_therapy.fit_transform(Y_raw['Suggested Therapy']),
-    le_selfcare.fit_transform(Y_raw['Self-care Advice'])
-])
+    print("Encoding target data...")
+    le_disorder = LabelEncoder()
+    le_urgency = LabelEncoder()
+    le_therapy = LabelEncoder()
+    le_selfcare = LabelEncoder()
 
-print("Training AI Model (Random Forest Multi-Output Classifier)...")
-# We use MultiOutputClassifier so it predicts all 4 categories at once
-base_model = RandomForestClassifier(n_estimators=100, random_state=42)
-model = MultiOutputClassifier(base_model, n_jobs=-1)
-model.fit(X, Y_encoded)
+    Y_encoded = np.column_stack([
+        le_disorder.fit_transform(Y_raw['Diagnosis / Condition']),
+        le_urgency.fit_transform(Y_raw['Urgency Level']),
+        le_therapy.fit_transform(Y_raw['Suggested Therapy']),
+        le_selfcare.fit_transform(Y_raw['Self-care Advice'])
+    ])
 
-print("Saving model and encoders...")
-# Create a folder to store the trained artifacts
-os.makedirs('model_artifacts', exist_ok=True)
+    print("Training AI Model (Random Forest Multi-Output Classifier)...")
+    base_model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model = MultiOutputClassifier(base_model, n_jobs=-1)
+    model.fit(X, Y_encoded)
 
-# Save the trained model
-joblib.dump(model, 'model_artifacts/ai_model.joblib')
+    print("Saving model and encoders...")
+    os.makedirs(artifacts_dir, exist_ok=True)
 
-# Save the encoders so the Node.js backend knows how to decode/encode data identically
-joblib.dump(le_symptoms, 'model_artifacts/le_symptoms.joblib')
-joblib.dump(le_diagnosis, 'model_artifacts/le_diagnosis.joblib')
-joblib.dump(le_disorder, 'model_artifacts/le_disorder.joblib')
-joblib.dump(le_urgency, 'model_artifacts/le_urgency.joblib')
-joblib.dump(le_therapy, 'model_artifacts/le_therapy.joblib')
-joblib.dump(le_selfcare, 'model_artifacts/le_selfcare.joblib')
+    # Save artifacts using absolute paths
+    joblib.dump(model, os.path.join(artifacts_dir, 'ai_model.joblib'))
+    joblib.dump(le_symptoms, os.path.join(artifacts_dir, 'le_symptoms.joblib'))
+    joblib.dump(le_diagnosis, os.path.join(artifacts_dir, 'le_diagnosis.joblib'))
+    joblib.dump(le_disorder, os.path.join(artifacts_dir, 'le_disorder.joblib'))
+    joblib.dump(le_urgency, os.path.join(artifacts_dir, 'le_urgency.joblib'))
+    joblib.dump(le_therapy, os.path.join(artifacts_dir, 'le_therapy.joblib'))
+    joblib.dump(le_selfcare, os.path.join(artifacts_dir, 'le_selfcare.joblib'))
 
-print("\n✅ SUCCESS: Model trained and saved successfully in the 'model_artifacts' folder!")
-print("You can now close this Python script.")
+    print("\n✅ SUCCESS: Model trained and saved successfully!")
+
+if __name__ == '__main__':
+    train_and_save_model()
