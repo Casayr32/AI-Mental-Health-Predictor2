@@ -1,8 +1,9 @@
+import os
+import spaces
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
 import numpy as np
-import os
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ df_dataset['Previous Diagnosis'] = df_dataset['Previous Diagnosis'].fillna('None
 if not os.path.exists(os.path.join(model_dir, 'ai_model.joblib')):
     print("⚠️ Model not found! Running train_model.py to generate models...")
     from train_model import train_and_save_model
-    train_and_save_model() # Hubi in function-kan uu ku jiro train_model.py
+    train_and_save_model()
 else:
     print("✅ Model files found.")
 
@@ -44,6 +45,7 @@ def bulletproof_transform(encoder, val):
     return encoder.transform([raw_classes[first_valid_idx]])[0]
 
 @app.route('/predict', methods=['POST'])
+@spaces.GPU
 def predict():
     try:
         data = request.json
@@ -92,8 +94,8 @@ def predict():
         x1 = bulletproof_transform(le_symptoms, r1)
         x2 = float(r2) / 51.0
         x3 = bulletproof_transform(le_diagnosis, r3)
-        x4 = 1 if r4 == 'Yes' else 0
-        x5 = 1 if r5 == 'Yes' else 0
+        x4 = 1 if str(r4).strip().lower() == 'yes' else 0
+        x5 = 1 if str(r5).strip().lower() == 'yes' else 0
         x6 = r6
         x7 = r7
 
