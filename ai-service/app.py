@@ -14,7 +14,6 @@ DATASET_PATH = os.path.join(BASE_DIR, "dataset.csv")
 MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'ai_model.joblib')
 
 # --- 2. AUTO-TRAINING LOGIC ---
-# If the model doesn't exist, train it right now before doing anything else
 if not os.path.exists(MODEL_PATH):
     print("❌ Model not found. Starting training process right now...")
     
@@ -81,7 +80,6 @@ if not os.path.exists(MODEL_PATH):
 
     except Exception as e:
         print(f"🔴 TRAINING FAILED: {str(e)}")
-        print("Please check your dataset.csv columns and data types.")
 
 # --- 3. LOAD ARTIFACTS ---
 print("Loading trained model and encoders...")
@@ -144,8 +142,22 @@ def predict_mental_health(symptoms, duration, prev_diagnosis, therapy_history, m
     except Exception as e:
         return {"Error": str(e)}
 
-# --- 6. GRADIO INTERFACE ---
-demo = gr.Interface(
+# --- 6. AUTHENTICATION FUNCTION (FOR YOUR REACT FRONTEND) ---
+def mock_login(email: str, password: str):
+    """
+    Mock authentication for the React frontend.
+    Replace this logic with your real database check later.
+    """
+    print(f"Login attempt for: {email}")
+    if email and password:
+        # Returning a mock success response
+        return {"success": True, "token": "fake-jwt-token-12345", "role": "admin"}
+    return {"success": False, "message": "Missing credentials"}
+
+# --- 7. BUILD GRADIO INTERFACES ---
+
+# Interface 1: The AI Predictor UI
+predictor_ui = gr.Interface(
     fn=predict_mental_health,
     inputs=[
         gr.Dropdown(label="Symptoms", choices=symptom_choices),
@@ -157,7 +169,27 @@ demo = gr.Interface(
         gr.Dropdown(label="Stress Level", choices=stress_choices)
     ],
     outputs="json",
-    title="MindCare AI Predictor"
+    title="MindCare AI Predictor",
+    api_name="/predict" # Optional: gives your react app a clean endpoint for predictions too
+)
+
+# Interface 2: The Auth API (Hidden from main UI, but accessible via POST request)
+auth_ui = gr.Interface(
+    fn=mock_login,
+    inputs=[
+        gr.Textbox(label="Email"),
+        gr.Textbox(label="Password")
+    ],
+    outputs="json",
+    api_name="/auth/login" # This creates the exact POST route your React app is looking for!
+)
+
+# --- 8. COMBINE AND LAUNCH ---
+# We use TabbedInterface so you can still test the predictor visually,
+# while React communicates with the auth API in the background.
+demo = gr.TabbedInterface(
+    interfaces=[predictor_ui, auth_ui], 
+    tab_names=["MindCare Predictor", "Auth API (For React)"]
 )
 
 if __name__ == "__main__":
