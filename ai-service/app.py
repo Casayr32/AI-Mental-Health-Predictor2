@@ -1,3 +1,12 @@
+import sys
+import huggingface_hub
+
+# --- CACHE-BUSTING FIX: Trick the broken cached gradio into working ---
+if not hasattr(huggingface_hub, 'HfFolder'):
+    class DummyHfFolder:
+        def get_token(self): return None
+    huggingface_hub.HfFolder = DummyHfFolder
+
 import os
 import joblib
 import numpy as np
