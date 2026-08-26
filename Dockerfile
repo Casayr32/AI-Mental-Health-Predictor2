@@ -9,9 +9,11 @@ COPY . .
 # Change directory INTO your ai-service folder where the code lives
 WORKDIR /home/user/app/ai-service
 
-# Upgrade pip first for reliability, then install requirements
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# FORCE the platform to delete the old cached Gradio and install a working version
+RUN pip install --no-cache-dir --force-reinstall gradio==3.50.2 huggingface_hub==0.19.4
+
+# Install the rest of the requirements
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the training script from inside that folder
 RUN python train_model.py
